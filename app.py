@@ -13,11 +13,22 @@ def root():
 
 
 @app.get("/reset")
-def reset():
-    obs = env.reset()
+def reset(difficulty: str = "easy"):
+    obs = env.reset(difficulty=difficulty)
     return {
         "observation": obs.dict(),
-        "done": False
+        "done": False,
+        "difficulty_selected": difficulty
+    }
+
+
+@app.get("/state")
+def state():
+    """Returns the current raw state of the environment for OpenEnv compliance."""
+    return {
+        "data_shape": env.data.shape if env.data is not None else None,
+        "step_count": env.steps,
+        "is_done": env.done
     }
 
 
