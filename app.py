@@ -1,11 +1,10 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from env.environment import DataCleaningEnv
 from env.models import Action
+from typing import Optional
 
 app = FastAPI()
-
 env = DataCleaningEnv()
-
 
 @app.get("/")
 def root():
@@ -18,30 +17,35 @@ def root():
             "reset_environment": "/reset",
             "take_action": "/step",
             "check_state": "/state"
-        },
-        "developer_note": "For a full system walkthrough, please refer to the README.md in the repository."
+        }
     }
 
-
-@app.get("/reset")
-def reset(difficulty: str = "easy"):
-    obs = env.reset(difficulty=difficulty)
+@app.api_route("/reset", methods=["GET", "POST"])
+async def reset(request: Request, difficulty: Optional[str] = "easy"):
+    # If it's a POST, we try to check JSON for difficulty, otherwise use query param
+    selected_difficulty = difficulty
+    if request.method == "POST":
+        try:
+            body = await request.json()
+            selected_difficulty = body.get("difficulty", difficulty)
+        except:
+            pass # Use query param or default if no JSON body
+            
+    obs = env.reset(difficulty=selected_difficulty)
     return {
         "observation": obs.dict(),
         "done": False,
-        "difficulty_selected": difficulty
+        "difficulty_selected": selected_difficulty
     }
 
-
-@app.get("/state")
+@app.api_route("/state", methods=["GET", "POST"])
 def state():
-    """Returns the current raw state of the environment for OpenEnv compliance."""
+    """Returns the current raw state of the environment."""
     return {
         "data_shape": env.data.shape if env.data is not None else None,
         "step_count": env.steps,
         "is_done": env.done
     }
-
 
 @app.post("/step")
 def step(action: Action):
