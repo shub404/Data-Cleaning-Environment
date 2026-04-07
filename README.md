@@ -1,16 +1,23 @@
-<<<<<<< HEAD
-# Data-Cleaning-Environment
-Data cleaning RL Environment for Scaler hackathon
-=======
 ---
-title: Data Cleaning Env
-emoji: 🔥
-colorFrom: green
-colorTo: purple
-sdk: docker
+title: Data Cleaning Environment
+emoji: 🧹
+colorFrom: blue
+colorTo: green
+sdk: gradio
+app_file: app.py
 pinned: false
-short_description: RL environment for automated data cleaning tasks
 ---
 
-Check out the configuration reference at https://huggingface.co/docs/hub/spaces-config-reference
->>>>>>> 20743565862957135d8937aaa17b1a9b417f8944
+# Data Cleaning Environment
+
+Data cleaning RL Environment for Scaler hackathon.
+
+This project provides a Docker-based API for automated data cleaning tasks using reinforcement learning.
+
+## Features
+- Data preprocessing
+- Cleaning pipelines
+- API-based inference
+
+## Usage
+Run via Docker or Hugging Face Spaces.
