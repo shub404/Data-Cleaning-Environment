@@ -1,0 +1,38 @@
+name: data-cleaning-env
+description: RL environment for cleaning messy tabular datasets
+
+version: 1.0
+
+entrypoint: app:app
+
+action_space:
+  type: object
+  properties:
+    action_type:
+      type: string
+      enum: [remove_duplicates, fill_missing, normalize_text, done]
+    column:
+      type: string
+      nullable: true
+
+observation_space:
+  type: object
+  properties:
+    data_preview:
+      type: array
+      items:
+        type: object
+    issues:
+      type: array
+      items:
+        type: string
+
+reward_range: [0.0, 1.0]
+
+tasks:
+  - name: easy
+    description: Remove duplicate rows
+  - name: medium
+    description: Handle missing values and formatting
+  - name: hard
+    description: Fully clean dataset
