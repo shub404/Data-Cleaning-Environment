@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "data-cleaning-env"
+version = "1.0.0"
+description = "RL environment for agentic data cleaning"
+authors = [
+    { name = "Hackathon Developer" }
+]
+dependencies = [
+    "pandas",
+    "pydantic",
+    "fastapi",
+    "uvicorn",
+    "openai",
+    "numpy",
+    "faker",
+    "rich"
+]
+requires-python = ">=3.9"
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["env*", "app.py"]
