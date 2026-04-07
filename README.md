@@ -55,11 +55,14 @@ python benchmark.py
 
 ---
 
-## 🏗 API Specification
+## 🏗 API Specification (Hugging Face Space)
 
--   `GET /reset?difficulty=[easy|medium|hard]`: Resets the environment with a random task.
--   `POST /step`: Applies a cleaning action and returns the new observation/reward.
--   `GET /`: Health check.
+You can explore the environment live at the following endpoints:
+
+-   **Interactive Dashboard**: [shubpaste404-data-cleaning-env.hf.space/docs](https://shubpaste404-data-cleaning-env.hf.space/docs) (Swagger UI)
+-   **Reset / Init Task**: [shubpaste404-data-cleaning-env.hf.space/reset](https://shubpaste404-data-cleaning-env.hf.space/reset)
+-   **Inspect State**: [shubpaste404-data-cleaning-env.hf.space/state](https://shubpaste404-data-cleaning-env.hf.space/state)
+-   **Step API**: POST request to `/step` with `Action` payload.
 
 ---
 

@@ -2,26 +2,34 @@ import requests
 import json
 import os
 import time
+from openai import OpenAI
 from rich.console import Console
-from rich.table import Table
 from rich.panel import Panel
 
 console = Console()
 
 # Official OpenEnv Env Vars
-BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
+API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
 MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o-mini")
-HF_TOKEN = os.getenv("HF_TOKEN", "")
+HF_TOKEN = os.getenv("HF_TOKEN")
+
+# OpenAI client configured with hackathon variables
+# We assume the base URL for the model is either API_BASE_URL or a derived path
+client = OpenAI(
+    base_url=f"{API_BASE_URL}/v1" if API_BASE_URL.endswith("/") is False else f"{API_BASE_URL}v1",
+    api_key=HF_TOKEN if HF_TOKEN else "no-token"
+)
 
 def log_start():
-    # Pure print for the official rigid grader
+    # OFFICIAL REQUIRED LOG
     print("[START]")
-    console.print(Panel("[bold cyan]🚀 Starting Agentic Data Cleaning Session[/bold cyan]", expand=False))
+    console.print(Panel("[bold cyan]🚀 Agentic Cleaning Session Started[/bold cyan]", expand=False))
 
 def log_step(step, action, reward, reasoning, done):
+    # OFFICIAL REQUIRED LOG (Strict Format)
     print(f"[STEP] step={step} action={action.get('action_type')} col={action.get('column')} reward={reward} done={done} reasoning='{reasoning}'")
     
-    # Rich Dashboard Output
+    # Rich UI for Human Viewers
     col_str = f"({action.get('column')})" if action.get('column') else ""
     console.print(f"  [bold yellow]Step {step}[/bold yellow] | Action: [green]{action.get('action_type')}{col_str}[/green]")
     console.print(f"  [dim]Reasoning: {reasoning}[/dim]")
@@ -29,133 +37,99 @@ def log_step(step, action, reward, reasoning, done):
     console.print("-" * 50)
 
 def log_end(final_score):
+    # OFFICIAL REQUIRED LOG
     print(f"[END] score={final_score:.4f}")
     if final_score > 0.9:
-        console.print(Panel(f"[bold green]✅ Success! Final DQS: {final_score:.4f}[/bold green]", expand=False))
+        console.print(Panel(f"[bold green]✅ Final DQS Score: {final_score:.4f}[/bold green]", expand=False))
     else:
-        console.print(Panel(f"[bold red]⚠️ Suboptimal Finish! Final DQS: {final_score:.4f}[/bold red]", expand=False))
+        console.print(Panel(f"[bold red]⚠️ Final DQS Score: {final_score:.4f}[/bold red]", expand=False))
 
 def generate_html_scorecard(start_data, end_data, final_score):
-    """Generates an HTML report showing before and after states."""
-    
+    """Creates a side-by-side comparison report."""
     html = f"""
     <!DOCTYPE html>
     <html>
-    <head>
-        <title>Data Quality Scorecard</title>
-        <style>
-            body {{ font-family: Arial, sans-serif; background-color: #f4f4f9; color: #333; margin: 40px; }}
-            h1 {{ color: #2c3e50; text-align: center; }}
-            .container {{ display: flex; justify-content: space-around; margin-top: 20px; }}
-            .table-container {{ width: 45%; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); overflow-x: auto; }}
-            table {{ border-collapse: collapse; width: 100%; font-size: 14px; text-align: left; }}
-            th, td {{ padding: 12px; border-bottom: 1px solid #ddd; }}
-            th {{ background-color: #4CAF50; color: white; }}
-            .score-gauge {{ text-align: center; font-size: 24px; font-weight: bold; margin: 20px; padding: 20px; border-radius: 8px; }}
-            .green {{ background-color: #d4edda; color: #155724; }}
-            .yellow {{ background-color: #fff3cd; color: #856404; }}
-            .red {{ background-color: #f8d7da; color: #721c24; }}
-        </style>
-    </head>
-    <body>
-        <h1>🧹 DataClean-RL Integrity Report</h1>
-        
-        <div class="score-gauge {'green' if final_score > 0.9 else 'yellow' if final_score > 0.5 else 'red'}">
-            Final Data Quality Score: {final_score:.2f}
-        </div>
-
-        <div class="container">
-            <div class="table-container">
-                <h2>Before (Dirty)</h2>
-                <pre>{json.dumps(start_data[:5], indent=2)}</pre>
-            </div>
-            
-            <div class="table-container">
-                <h2>After (Cleaned)</h2>
-                <pre>{json.dumps(end_data[:5], indent=2)}</pre>
-            </div>
-        </div>
-    </body>
-    </html>
-    """
-    with open("integrity_report.html", "w") as f:
-        f.write(html)
-    console.print("[bold blue]📝 HTML Scorecard generated -> integrity_report.html[/bold blue]")
+    <head><title>Scorecard</title><style>
+    body{{font-family:sans-serif;margin:40px;background:#f8f9fa;}}
+    .score{{font-size:32px;font-weight:bold;margin:20px;padding:20px;border-radius:12px;text-align:center;}}
+    .green{{background:#d4edda;color:#155724;}} .red{{background:#f8d7da;color:#721c24;}}
+    .box{{background:white;padding:20px;border-radius:12px;box-shadow:0 4px 6px rgba(0,0,0,0.1);overflow:auto;width:45%;}}
+    </style></head><body>
+    <h1>DataClean-RL Performance Report</h1>
+    <div class="score {'green' if final_score > 0.8 else 'red'}">Final Score: {final_score:.4f}</div>
+    <div style="display:flex;justify-content:space-between;">
+    <div class="box"><h3>Before</h3><pre>{json.dumps(start_data[:5], indent=2)}</pre></div>
+    <div class="box"><h3>After</h3><pre>{json.dumps(end_data[:5], indent=2)}</pre></div>
+    </div></body></html>"""
+    with open("integrity_report.html", "w") as f: f.write(html)
+    console.print("[bold blue]📝 Integrity report generated -> integrity_report.html[/bold blue]")
 
 def get_action_from_llm(observation, reflection_prompt=""):
     """
-    LLM agent with Reflection support.
+    Standard OpenAI call using Hackathon environment variables.
     """
-    issues = observation.get("issues", [])
-    if not issues:
-        return {"action_type": "done", "column": None}
-    
-    # Mocking self-correction based on reflection
-    if "try something else" in reflection_prompt:
-        # We try the second issue if the first one failed
-        issue = issues[-1] if len(issues) > 1 else issues[0]
-    else:
+    if not HF_TOKEN:
+        # Heuristic fallback if no token provided
+        issues = observation.get("issues", [])
+        if not issues: return {"action_type": "done"}
         issue = issues[0]
-        
-    if issue == "duplicates":
-        return {"action_type": "remove_duplicates", "column": None}
-    elif "missing_values" in issue:
-        return {"action_type": "fill_missing", "column": issue.split(":")[1]}
-    elif "format_inconsistency" in issue:
+        if issue == "duplicates": return {"action_type": "remove_duplicates"}
+        if "missing" in issue: return {"action_type": "fill_missing", "column": issue.split(":")[1]}
         return {"action_type": "normalize_text", "column": issue.split(":")[1]}
-    
-    return {"action_type": "done", "column": None}
+
+    prompt = f"Observation: {json.dumps(observation)}. {reflection_prompt} Decide next cleaning action."
+    try:
+        response = client.chat.completions.create(
+            model=MODEL_NAME,
+            messages=[{"role": "user", "content": prompt}],
+            response_format={ "type": "json_object" }
+        )
+        return json.loads(response.choices[0].message.content)
+    except:
+        return {"action_type": "done"}
 
 def main():
     log_start()
     
-    # 1. Reset Environment
-    res = requests.get(f"{BASE_URL}/reset?difficulty=hard")
+    # Init Env
+    res = requests.get(f"{API_BASE_URL}/reset?difficulty=hard")
     data = res.json()
     obs = data["observation"]
     start_data = obs["data_preview"]
     
     total_reward = 0
-    previous_reward = 0
-    reflection_prompt = ""
+    prev_reward = 0
+    reflection = ""
     
-    with console.status("[bold green]Agent is thinking and cleaning...") as status:
-        for step_idx in range(1, 15): # Max 15 steps
-            # 2. Get AI Decision (with reflection)
-            action = get_action_from_llm(obs, reflection_prompt)
+    with console.status("[bold green]Cleaning Data...") as status:
+        for i in range(1, 11):
+            action = get_action_from_llm(obs, reflection)
             
-            # 3. Execute Step
-            res = requests.post(f"{BASE_URL}/step", json=action)
-            result = res.json()
+            res = requests.post(f"{API_BASE_URL}/step", json=action)
+            res_data = res.json()
             
-            reward = result["reward"]
-            done = result["done"]
-            reasoning = result["info"].get("reasoning", "n/a")
+            reward = res_data["reward"]
+            done = res_data["done"]
+            reason = res_data["info"].get("reasoning", "n/a")
             
-            log_step(step_idx, action, reward, reasoning, done)
+            log_step(i, action, reward, reason, done)
             
-            # Reflection Loop (Self-Correction)
-            if reward < previous_reward:
-                reflection_prompt = f"Last action {action.get('action_type')} caused reward to drop from {previous_reward} to {reward}. Warning, try something else."
-                console.print(f"  [bold red]🧠 Reflection Activated:[/bold red] Agent learned that action degraded quality.")
-            elif reward == previous_reward and not done:
-                reflection_prompt = f"Last action had no effect. Try something else."
-                console.print(f"  [bold yellow]🧠 Reflection Activated:[/bold yellow] Agent learned action had no effect.")
+            # Reflection Logic
+            if reward < prev_reward:
+                reflection = "Previous action degraded quality. Try a different approach."
+                console.print(f"  [bold red]🧠 Reflection Loop:[/bold red] Agent detected quality drop.")
             else:
-                reflection_prompt = "" # Reset
-            
-            previous_reward = reward
-            obs = result["observation"]
+                reflection = ""
+                
+            prev_reward = reward
+            obs = res_data["observation"]
             
             if done:
                 total_reward = reward
                 break
-                
-            time.sleep(0.5) # Simulate LLM delay for dramatic demo effect
+            time.sleep(0.3)
             
     log_end(total_reward)
-    
-    # Generate the scorecard
     generate_html_scorecard(start_data, obs["data_preview"], total_reward)
 
 if __name__ == "__main__":

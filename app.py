@@ -9,7 +9,18 @@ env = DataCleaningEnv()
 
 @app.get("/")
 def root():
-    return {"status": "running"}
+    """Welcome page with navigation for hackathon judges."""
+    return {
+        "project": "DataClean-RL v2.0",
+        "status": "Online",
+        "endpoints": {
+            "interactive_docs": "/docs",
+            "reset_environment": "/reset",
+            "take_action": "/step",
+            "check_state": "/state"
+        },
+        "developer_note": "For a full system walkthrough, please refer to the README.md in the repository."
+    }
 
 
 @app.get("/reset")
