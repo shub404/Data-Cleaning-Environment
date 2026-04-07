@@ -14,8 +14,8 @@ class DataCleaningEnv:
         self.steps = 0
         self.max_steps = 10
 
-    def reset(self, scenario="ecommerce"):
-        self.data = load_sample_data(scenario)
+    def reset(self, difficulty: str = "easy"):
+        self.data = load_sample_data(difficulty)
         self.ground_truth = get_ground_truth(self.data)
         self.done = False
         self.steps = 0

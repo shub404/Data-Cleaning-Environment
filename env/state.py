@@ -4,16 +4,17 @@ import numpy as np
 
 def load_sample_data(difficulty="easy"):
     """
-    Dynamically loads a task based on difficulty level.
-    Supported: 'easy', 'medium', 'hard'
+    Unified entry point for loading tasks by difficulty.
     """
-    try:
-        module = importlib.import_module(f"env.tasks.{difficulty}")
-        return module.get_task()
-    except (ImportError, AttributeError):
-        # Fallback to easy if not found
+    if difficulty == "easy":
         from env.tasks import easy
         return easy.get_task()
+    elif difficulty == "medium":
+        from env.tasks import medium
+        return medium.get_task()
+    else:
+        from env.tasks import hard
+        return hard.get_task()
 
 def get_ground_truth(df: pd.DataFrame):
     """
