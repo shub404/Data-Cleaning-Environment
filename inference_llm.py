@@ -3,7 +3,6 @@ import json
 import os
 from openai import OpenAI
 
-# Configuration
 BASE_URL = "http://localhost:8000"
 
 def get_llm_action(observation):
@@ -71,7 +70,6 @@ def mock_llm_logic(obs):
 def run_cleaning_session(difficulty="medium"):
     print(f"\n=== Starting Data Cleaning Session ({difficulty.upper()}) ===")
     
-    # 1. Reset Environment
     res = requests.get(f"{BASE_URL}/reset?difficulty={difficulty}")
     data = res.json()
     obs = data["observation"]
@@ -79,12 +77,10 @@ def run_cleaning_session(difficulty="medium"):
     total_reward = 0
     
     for step in range(1, 11):
-        # 2. Get AI Decision
         decision = get_llm_action(obs)
         print(f"[STEP {step}] Reasoning: {decision.get('reasoning')}")
         print(f"         Action: {decision.get('action_type')} ({decision.get('column')})")
         
-        # 3. Execute Step
         res = requests.post(f"{BASE_URL}/step", json={
             "action_type": decision["action_type"],
             "column": decision.get("column")

@@ -3,7 +3,6 @@ import json
 import os
 from openai import OpenAI
 
-# Configuration
 BASE_URL = "http://localhost:8000"
 
 def get_cleaning_plan(observation):
@@ -56,7 +55,6 @@ def mock_planner_logic(obs):
     issues = obs.get("issues", [])
     plan = []
     
-    # Static Planning Strategy
     for issue in issues:
         if issue == "duplicates":
             plan.append({"action_type": "remove_duplicates", "column": None})
@@ -73,18 +71,15 @@ def mock_planner_logic(obs):
 def run_planner_session(difficulty="hard"):
     print(f"\n=== Starting Multi-Step Planning Session ({difficulty.upper()}) ===")
     
-    # 1. Reset Environment
     res = requests.get(f"{BASE_URL}/reset?difficulty={difficulty}")
     data = res.json()
     obs = data["observation"]
     
-    # 2. Get AI Plan
     full_plan = get_cleaning_plan(obs)
     plan = full_plan.get("plan", [])
     print(f"[PLANNER] Strategy: {full_plan.get('reasoning')}")
     print(f"[PLANNER] Sequence: {[step['action_type'] for step in plan]}")
     
-    # 3. Execute Plan
     final_reward = 0
     for idx, step in enumerate(plan):
         print(f"Step {idx+1}: Executing {step['action_type']} on {step.get('column')}...")

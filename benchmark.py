@@ -8,15 +8,12 @@ BASE_URL = "http://localhost:8000"
 
 def run_trial(difficulty="medium"):
     """Runs a single cleaning trial and returns metrics."""
-    # 1. Reset
     res = requests.get(f"{BASE_URL}/reset?difficulty={difficulty}")
     obs = res.json()["observation"]
     
     start_time = time.time()
     steps = 0
     
-    # Simple Mock Heuristic Agent for Benchmarking
-    # (In production, this would call your Planner/Agent)
     while steps < 10:
         steps += 1
         issues = obs.get("issues", [])
@@ -68,13 +65,11 @@ def run_benchmark(difficulty="hard", n_trials=5):
     for k, v in summary.items():
         print(f"{k:15}: {v:.4f}" if isinstance(v, float) else f"{k:15}: {v}")
     
-    # Save to CSV for presentation
     df.to_csv(f"benchmark_{difficulty}.csv", index=False)
     print(f"\nResults saved to benchmark_{difficulty}.csv")
     print("--------------------------\n")
 
 if __name__ == "__main__":
-    # Ensure the server is running before executing this
     try:
         run_benchmark(difficulty="hard", n_trials=5)
     except Exception as e:

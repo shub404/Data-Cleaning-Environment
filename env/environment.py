@@ -25,8 +25,7 @@ class DataCleaningEnv:
         self.steps += 1
         reward = 0.0
         reasoning = ""
-        
-        # Action Logic
+
         if action.action_type == "remove_duplicates":
             before = len(self.data)
             self.data = self.data.drop_duplicates()
@@ -65,7 +64,6 @@ class DataCleaningEnv:
             reward = calculate_reward(self.data, self.ground_truth)
             reasoning = f"Session complete. Final DQS: {reward}"
 
-        # Termination conditions
         if self.steps >= self.max_steps:
             self.done = True
             reasoning += " (Max steps reached)"
@@ -100,13 +98,11 @@ class DataCleaningEnv:
             if self.data[col].isnull().sum() > 0:
                 issues.append(f"missing_values:{col}")
             
-            # 2. Case Inconsistency
             if self.data[col].dtype == 'object':
                 unique_cases = self.data[col].astype(str).str[0].str.isupper().unique()
                 if len(unique_cases) > 1:
                     issues.append(f"format_inconsistency:{col}")
 
-            # 3. Outlier Detection (Z-score > 3)
             if self.data[col].dtype in [np.float64, np.int64]:
                 mean = self.data[col].mean()
                 std = self.data[col].std()
@@ -115,4 +111,4 @@ class DataCleaningEnv:
                     if outliers > 0:
                         issues.append(f"outlier_detected:{col}")
 
-        return issues
+        return issues

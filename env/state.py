@@ -24,7 +24,7 @@ def get_ground_truth(df: pd.DataFrame):
     clean_df = df.copy()
     clean_df = clean_df.drop_duplicates()
     
-    # 1. Fill nulls with mean or 'Unknown'
+    # Fill missing values appropriately
     for col in clean_df.columns:
         if clean_df[col].isnull().sum() > 0:
             if clean_df[col].dtype == np.number:
@@ -32,7 +32,7 @@ def get_ground_truth(df: pd.DataFrame):
             else:
                 clean_df[col] = clean_df[col].fillna("Unknown")
     
-    # 2. Normalize capitalization
+    # Standardize capitalization for string columns
     str_cols = clean_df.select_dtypes(include=['object']).columns
     for col in str_cols:
         clean_df[col] = clean_df[col].astype(str).str.capitalize()
