@@ -64,4 +64,4 @@ python benchmark.py
 ---
 
 ## 🏆 Winners Choice
-Developed for top-tier hackathons. Optimized for clarity, performance, and impact.
+Developed for top-tier hackathons. Optimized for clarity, performance and impact.
