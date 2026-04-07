@@ -17,13 +17,17 @@ dependencies = [
     "openai",
     "numpy",
     "faker",
-    "rich"
+    "rich",
+    "openenv-core>=0.2.0"
 ]
 requires-python = ">=3.9"
+
+[project.scripts]
+openenv-server = "server.app:main"
 
 [project.optional-dependencies]
 dev = ["pytest"]
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["env*", "app.py"]
+include = ["env*", "server*"]
