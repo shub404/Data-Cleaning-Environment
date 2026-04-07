@@ -1,11 +1,10 @@
 ---
-title: Data Cleaning Environment
-emoji: 🧹
+title: Data Cleaning Env
+emoji: 🚀
 colorFrom: blue
 colorTo: green
-sdk: gradio
-app_file: app.py
-pinned: false
+sdk: docker
+app_port: 7860
 ---
 
 # Data Cleaning Environment
