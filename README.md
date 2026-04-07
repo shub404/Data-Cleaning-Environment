@@ -1,5 +1,14 @@
-# 🚀 DataClean-RL: Agentic Cleaning Environment v2.0
+---
+title: DataClean RL
+emoji: 🚀
+colorFrom: blue
+colorTo: green
+sdk: docker
+app_port: 7860
+pinned: false
+---
 
+# 🚀 DataClean-RL: Agentic Cleaning Environment v2.0
 **DataClean-RL** is a professional-grade Reinforcement Learning environment for automated data cleaning. It uses a **Strategic AI Planner** to analyze messy datasets and systematically fix missing values, formatting inconsistencies, duplicates, and outliers.
 
 ## ✨ Features (Hackathon Optimized)
