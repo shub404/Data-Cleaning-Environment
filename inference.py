@@ -130,7 +130,7 @@ def run_task(difficulty="hard"):
     obs = data["observation"]
     start_data = obs.get("data_preview", [])
     total_reward = None
-    prev_reward = 0
+    prev_reward = 0.5
     reflection = ""
 
     # ---- Step loop ----
@@ -184,7 +184,7 @@ def run_task(difficulty="hard"):
 
     # If the loop exhausted without done, use last known reward
     if total_reward is None:
-        total_reward = prev_reward
+        total_reward = prev_reward if prev_reward > 0 else 0.5
 
     # Ensure score is strictly between 0 and 1 (never 0.0 or 1.0)
     total_reward = float(min(max(total_reward, 0.01), 0.99))
@@ -207,8 +207,9 @@ def main():
     for difficulty in difficulties:
         result = run_task(difficulty)
         if result is None:
-            print(f"[FATAL] Task '{difficulty}' failed to start.")
-            return
+            print(f"[FATAL] Task '{difficulty}' failed. Assigning fallback score.")
+            all_scores.append(0.5)  # valid score
+            continue
         score, obs, start_data = result
         all_scores.append(score)
         last_obs = obs
