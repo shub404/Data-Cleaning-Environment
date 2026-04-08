@@ -2,217 +2,210 @@ import requests
 import json
 import os
 import time
-from openai import OpenAI
-from rich.console import Console
-from rich.panel import Panel
 import traceback
+from openai import OpenAI
 
-console = Console()
+# ============================================================
+# URL ROUTING (CRITICAL):
+#   ENV_URL  = local environment server (FastAPI on port 7860)
+#   API_BASE_URL = LiteLLM proxy injected by the validator
+#   API_KEY  = proxy key injected by the validator
+# ============================================================
+ENV_URL = "http://localhost:7860"
+API_BASE_URL = os.environ.get("API_BASE_URL", "https://api.openai.com/v1")
+API_KEY = os.environ.get("API_KEY", "")
+MODEL_NAME = os.environ.get("MODEL_NAME", "gpt-4o-mini")
 
-# Env Vars - OpenEnv sets API_BASE_URL for the LLM proxy, NOT the environment server.
-# The environment server runs locally inside the container (port 7860).
-ENV_URL = os.getenv("ENV_URL", "http://localhost:7860")
-API_BASE_URL = os.getenv("API_BASE_URL", "https://api.openai.com")
-MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o-mini")
-API_KEY = os.getenv("API_KEY")
+print(f"[CONFIG] ENV_URL      = {ENV_URL}")
+print(f"[CONFIG] API_BASE_URL = {API_BASE_URL}")
+print(f"[CONFIG] MODEL_NAME   = {MODEL_NAME}")
+print(f"[CONFIG] API_KEY      = {'SET (' + API_KEY[:8] + '...)' if API_KEY else 'NOT SET'}")
 
-# OpenAI client configured with hackathon variables
+# OpenAI client — uses the validator's LiteLLM proxy URL directly
+# The validator says: base_url=os.environ["API_BASE_URL"]
 client = OpenAI(
-    base_url=f"{API_BASE_URL}/v1" if not API_BASE_URL.endswith("/") else f"{API_BASE_URL}v1",
-    api_key=API_KEY if API_KEY else "no-token"
+    base_url=API_BASE_URL,
+    api_key=API_KEY if API_KEY else "no-key",
 )
 
-# ---------------- SAFE HELPERS ---------------- #
 
-def safe_request(method, url, **kwargs):
+# -------------------- HELPERS -------------------- #
+
+def env_request(method, path, **kwargs):
+    """Make a request to the LOCAL environment server. Never to the LLM proxy."""
+    url = f"{ENV_URL}{path}"
     try:
-        print(f"[HTTP] {method.upper()} {url}")
-        res = requests.request(method, url, timeout=10, **kwargs)
-        print(f"[HTTP] Status: {res.status_code}")
-        if res.status_code != 200:
-            print(f"[HTTP ERROR] Non-200 response: {res.status_code}")
-            print(f"[HTTP ERROR] Body: {res.text[:500]}")
+        print(f"[ENV] {method.upper()} {url}")
+        res = requests.request(method, url, timeout=15, **kwargs)
+        print(f"[ENV] Status: {res.status_code}")
         return res
-    except requests.exceptions.RequestException as e:
-        print(f"[NETWORK ERROR] {method.upper()} {url} -> {e}")
+    except Exception as e:
+        print(f"[ENV ERROR] {method.upper()} {url} -> {e}")
         return None
 
-def safe_json(res):
+
+def parse_json(res):
+    """Safely parse JSON from a response."""
     if res is None:
-        print("[ERROR] Cannot parse JSON from None response")
         return None
     try:
-        data = res.json()
-        print(f"[JSON] Keys: {list(data.keys()) if isinstance(data, dict) else type(data).__name__}")
-        return data
+        return res.json()
     except Exception as e:
-        print(f"[ERROR] JSON parse failed: {e}")
-        print(f"[ERROR] Raw response ({res.status_code}): {res.text[:500]}")
+        print(f"[JSON ERROR] {e}")
+        print(f"[JSON ERROR] Raw: {res.text[:500]}")
         return None
 
-# ---------------- LOGGING ---------------- #
 
-def log_start():
-    print("[START]")
-    console.print(Panel("[bold cyan]🚀 Agentic Cleaning Session Started[/bold cyan]", expand=False))
-
-def log_step(step, action, reward, reasoning, done):
-    print(f"[STEP] step={step} action={action.get('action_type')} col={action.get('column')} reward={reward} done={done} reasoning='{reasoning}'")
-    
-    col_str = f"({action.get('column')})" if action.get('column') else ""
-    console.print(f"  [bold yellow]Step {step}[/bold yellow] | Action: [green]{action.get('action_type')}{col_str}[/green]")
-    console.print(f"  [dim]Reasoning: {reasoning}[/dim]")
-    console.print(f"  [bold]Current Score:[/bold] {reward}")
-    console.print("-" * 50)
-
-def log_end(final_score):
-    print(f"[END] score={final_score:.4f}")
-    if final_score > 0.9:
-        console.print(Panel(f"[bold green]✅ Final DQS Score: {final_score:.4f}[/bold green]", expand=False))
-    else:
-        console.print(Panel(f"[bold red]⚠️ Final DQS Score: {final_score:.4f}[/bold red]", expand=False))
-
-# ---------------- HTML REPORT ---------------- #
-
-def generate_html_scorecard(start_data, end_data, final_score):
-    try:
-        html = f"""
-        <!DOCTYPE html>
-        <html>
-        <head><title>Scorecard</title></head>
-        <body>
-        <h1>DataClean-RL Performance Report</h1>
-        <h2>Final Score: {final_score:.4f}</h2>
-        <h3>Before</h3>
-        <pre>{json.dumps(start_data[:5], indent=2)}</pre>
-        <h3>After</h3>
-        <pre>{json.dumps(end_data[:5], indent=2)}</pre>
-        </body>
-        </html>
-        """
-        with open("integrity_report.html", "w") as f:
-            f.write(html)
-    except Exception as e:
-        print("[HTML ERROR]", str(e))
-
-# ---------------- LLM ---------------- #
-
-def get_action_from_llm(observation, reflection_prompt=""):
+def get_action_from_llm(observation, reflection=""):
     """
-    Standard OpenAI call using Hackathon environment variables.
+    ALWAYS call the LLM via the injected proxy.
+    Falls back to heuristic ONLY if LLM call fails, not if key is missing.
     """
-    if not API_KEY:
-        # Heuristic fallback if no token provided
-        issues = observation.get("issues", [])
-        if not issues: return {"action_type": "done"}
-        issue = issues[0]
-        if issue == "duplicates": return {"action_type": "remove_duplicates"}
-        if "missing" in issue: return {"action_type": "fill_missing", "column": issue.split(":")[1]}
-        return {"action_type": "normalize_text", "column": issue.split(":")[1]}
+    system_msg = (
+        "You are a data cleaning RL agent. Based on the observation, decide the next action. "
+        "Available actions: remove_duplicates, fill_missing (needs column), "
+        "normalize_text (needs column), done. "
+        "Return ONLY a JSON object with keys: action_type, column (or null), reasoning."
+    )
+    user_msg = f"Observation: {json.dumps(observation)}"
+    if reflection:
+        user_msg += f"\nReflection: {reflection}"
+    user_msg += "\nDecide the next cleaning action. Return JSON only."
 
-    prompt = f"Observation: {json.dumps(observation)}. {reflection_prompt} Decide next cleaning action."
     try:
+        print(f"[LLM] Calling {MODEL_NAME} via {API_BASE_URL}...")
         response = client.chat.completions.create(
             model=MODEL_NAME,
-            messages=[{"role": "user", "content": prompt}],
-            response_format={"type": "json_object"}
+            messages=[
+                {"role": "system", "content": system_msg},
+                {"role": "user", "content": user_msg},
+            ],
+            response_format={"type": "json_object"},
         )
-        return json.loads(response.choices[0].message.content)
+        result = json.loads(response.choices[0].message.content)
+        print(f"[LLM] Response: {result}")
+        return result
     except Exception as e:
-        print("[LLM ERROR]", str(e))
-        return {"action_type": "done"}
+        print(f"[LLM ERROR] {e}")
+        print("[LLM] Falling back to heuristic...")
+        return heuristic_action(observation)
 
-# ---------------- MAIN ---------------- #
+
+def heuristic_action(observation):
+    """Rule-based fallback if LLM fails."""
+    issues = observation.get("issues", [])
+    if not issues:
+        return {"action_type": "done", "column": None}
+    issue = issues[0]
+    if issue == "duplicates":
+        return {"action_type": "remove_duplicates", "column": None}
+    if "missing" in issue and ":" in issue:
+        return {"action_type": "fill_missing", "column": issue.split(":")[1]}
+    if "format" in issue and ":" in issue:
+        return {"action_type": "normalize_text", "column": issue.split(":")[1]}
+    return {"action_type": "done", "column": None}
+
+
+# -------------------- MAIN -------------------- #
 
 def main():
-    log_start()
+    print("[START] Agentic Data Cleaning Session")
 
     try:
-        # RESET
-        res = safe_request("GET", f"{ENV_URL}/reset?difficulty=hard")
+        # ---- RESET the environment ----
+        res = env_request("GET", "/reset?difficulty=hard")
         if not res:
-            print("[FATAL] Reset request failed — is the server running?")
-            print(f"[FATAL] Tried to reach: {ENV_URL}")
+            print("[FATAL] Cannot reach environment server at " + ENV_URL)
             return
-
         if res.status_code != 200:
-            print(f"[FATAL] Reset returned HTTP {res.status_code}")
-            print(f"[FATAL] Body: {res.text[:500]}")
+            print(f"[FATAL] /reset returned {res.status_code}: {res.text[:500]}")
             return
 
-        data = safe_json(res)
+        data = parse_json(res)
         if not data:
-            print("[FATAL] Could not parse reset response as JSON")
+            print("[FATAL] /reset response is not valid JSON")
             return
-
         if "observation" not in data:
-            print(f"[FATAL] Reset response missing 'observation' key")
-            print(f"[FATAL] Available keys: {list(data.keys())}")
-            print(f"[FATAL] Full response: {json.dumps(data, indent=2)[:1000]}")
+            print(f"[FATAL] /reset missing 'observation'. Keys: {list(data.keys())}")
+            print(f"[FATAL] Body: {json.dumps(data)[:800]}")
             return
 
         obs = data["observation"]
         start_data = obs.get("data_preview", [])
-
         total_reward = 0
         prev_reward = 0
         reflection = ""
 
-        with console.status("[bold green]Cleaning Data..."):
-            for i in range(1, 11):
+        # ---- Step loop ----
+        for i in range(1, 11):
+            print(f"\n--- Step {i} ---")
 
-                action = get_action_from_llm(obs, reflection)
+            action = get_action_from_llm(obs, reflection)
 
-                res = safe_request("POST", f"{ENV_URL}/step", json=action)
-                if not res:
-                    print(f"[ERROR] Step {i} request failed")
-                    break
+            # Send action to environment
+            step_payload = {
+                "action_type": action.get("action_type", "done"),
+                "column": action.get("column"),
+            }
+            res = env_request("POST", "/step", json=step_payload)
+            if not res or res.status_code != 200:
+                print(f"[ERROR] /step failed at step {i}")
+                break
 
-                if res.status_code != 200:
-                    print(f"[ERROR] Step {i} returned HTTP {res.status_code}")
-                    print(f"[ERROR] Body: {res.text[:500]}")
-                    break
+            res_data = parse_json(res)
+            if not res_data:
+                print(f"[ERROR] /step response not valid JSON at step {i}")
+                break
 
-                res_data = safe_json(res)
-                if not res_data:
-                    print(f"[ERROR] Step {i} response not valid JSON")
-                    break
+            reward = res_data.get("reward", 0)
+            done = res_data.get("done", False)
+            info = res_data.get("info", {})
+            reasoning = info.get("reasoning", "n/a")
 
-                reward = res_data.get("reward", 0)
-                done = res_data.get("done", False)
-                reason = res_data.get("info", {}).get("reasoning", "n/a")
+            print(f"[STEP {i}] action={step_payload['action_type']} col={step_payload.get('column')} reward={reward} done={done}")
+            print(f"[STEP {i}] reasoning: {reasoning}")
 
-                log_step(i, action, reward, reason, done)
+            # Reflection for next step
+            if reward < prev_reward:
+                reflection = "Previous action degraded quality. Try a different approach."
+            else:
+                reflection = ""
+            prev_reward = reward
 
-                # Reflection
-                if reward < prev_reward:
-                    reflection = "Previous action degraded quality. Try a different approach."
-                else:
-                    reflection = ""
+            if "observation" not in res_data:
+                print("[WARN] No observation in step response, ending early")
+                total_reward = reward
+                break
 
-                prev_reward = reward
+            obs = res_data["observation"]
 
-                if "observation" not in res_data:
-                    print("[ERROR] Missing observation → terminating early")
-                    total_reward = prev_reward
-                    break
+            if done:
+                total_reward = reward
+                break
 
-                obs = res_data["observation"]
+            time.sleep(0.3)
 
-                if done:
-                    total_reward = reward
-                    break
+        print(f"\n[END] Final score: {total_reward:.4f}")
 
-                time.sleep(0.3)
-
-        log_end(total_reward)
-
-        end_preview = obs.get("data_preview", []) if obs else []
-        generate_html_scorecard(start_data, end_preview, total_reward)
+        # ---- HTML report ----
+        try:
+            end_preview = obs.get("data_preview", []) if isinstance(obs, dict) else []
+            html = f"""<!DOCTYPE html>
+<html><head><title>Scorecard</title></head><body>
+<h1>DataClean-RL Report</h1>
+<h2>Final Score: {total_reward:.4f}</h2>
+<h3>Before</h3><pre>{json.dumps(start_data[:5], indent=2)}</pre>
+<h3>After</h3><pre>{json.dumps(end_preview[:5], indent=2)}</pre>
+</body></html>"""
+            with open("integrity_report.html", "w") as f:
+                f.write(html)
+        except Exception as e:
+            print(f"[HTML ERROR] {e}")
 
     except Exception as e:
-        print("[FATAL ERROR]", str(e))
+        print(f"[FATAL] {e}")
         traceback.print_exc()
+
 
 if __name__ == "__main__":
     main()
