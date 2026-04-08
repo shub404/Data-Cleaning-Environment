@@ -9,8 +9,10 @@ import traceback
 
 console = Console()
 
-# Env Vars - Defaulting to 7860 to match Dockerfile EXPOSE port
-API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:7860")
+# Env Vars - OpenEnv sets API_BASE_URL for the LLM proxy, NOT the environment server.
+# The environment server runs locally inside the container (port 7860).
+ENV_URL = os.getenv("ENV_URL", "http://localhost:7860")
+API_BASE_URL = os.getenv("API_BASE_URL", "https://api.openai.com")
 MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o-mini")
 API_KEY = os.getenv("API_KEY")
 
@@ -127,10 +129,10 @@ def main():
 
     try:
         # RESET
-        res = safe_request("GET", f"{API_BASE_URL}/reset?difficulty=hard")
+        res = safe_request("GET", f"{ENV_URL}/reset?difficulty=hard")
         if not res:
             print("[FATAL] Reset request failed — is the server running?")
-            print(f"[FATAL] Tried to reach: {API_BASE_URL}")
+            print(f"[FATAL] Tried to reach: {ENV_URL}")
             return
 
         if res.status_code != 200:
@@ -161,7 +163,7 @@ def main():
 
                 action = get_action_from_llm(obs, reflection)
 
-                res = safe_request("POST", f"{API_BASE_URL}/step", json=action)
+                res = safe_request("POST", f"{ENV_URL}/step", json=action)
                 if not res:
                     print(f"[ERROR] Step {i} request failed")
                     break
