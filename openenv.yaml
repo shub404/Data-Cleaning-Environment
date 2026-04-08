@@ -27,18 +27,21 @@ observation_space:
       items:
         type: string
 
-reward_range: [0.0001, 0.9999]
+reward_range: [0.01, 0.99]
 
 tasks:
-  - name: easy
-    description: Remove duplicate rows
+  - id: easy
+    name: easy
+    description: "Remove duplicate rows and fix simple missing values"
     grader:
       type: reward
-  - name: medium
-    description: Handle missing values and formatting
+  - id: medium
+    name: medium
+    description: "Handle missing values, casing inconsistencies, and duplicates"
     grader:
       type: reward
-  - name: hard
-    description: Fully clean dataset
+  - id: hard
+    name: hard
+    description: "Fully clean complex dataset with mixed formats, outliers and missing data"
     grader:
       type: reward

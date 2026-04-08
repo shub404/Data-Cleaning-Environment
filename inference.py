@@ -5,12 +5,6 @@ import time
 import traceback
 from openai import OpenAI
 
-# ============================================================
-# URL ROUTING (CRITICAL):
-#   ENV_URL  = local environment server (FastAPI on port 7860)
-#   API_BASE_URL = LiteLLM proxy injected by the validator
-#   API_KEY  = proxy key injected by the validator
-# ============================================================
 ENV_URL = "http://localhost:7860"
 API_BASE_URL = os.environ.get("API_BASE_URL", "https://api.openai.com/v1")
 API_KEY = os.environ.get("API_KEY", "")
@@ -193,9 +187,11 @@ def run_task(difficulty="hard"):
         total_reward = prev_reward
 
     # Ensure score is strictly between 0 and 1 (never 0.0 or 1.0)
-    total_reward = float(min(max(total_reward, 0.0001), 0.9999))
+    total_reward = float(min(max(total_reward, 0.01), 0.99))
 
-    print(f"\n[TASK END] difficulty={difficulty} | Final score: {total_reward:.4f}")
+    print(f"\n[TASK END] difficulty={difficulty}")
+    print(f"Final score: {total_reward:.4f}")
+    print(f"Score: {total_reward}") # Official format for some validators
     return total_reward, obs, start_data
 
 

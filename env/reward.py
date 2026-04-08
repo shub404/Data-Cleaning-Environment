@@ -6,7 +6,7 @@ def calculate_reward(current_data: pd.DataFrame, ground_truth: pd.DataFrame):
     Calculates a multi-dimensional Data Quality Score ranging from 0 to 1.0.
     """
     if current_data.empty:
-        return -1.0
+        return 0.01
         
     dup_count = current_data.duplicated().sum()
     uniqueness = max(0, 1 - (dup_count / len(current_data)))
@@ -39,4 +39,6 @@ def calculate_reward(current_data: pd.DataFrame, ground_truth: pd.DataFrame):
 
     # OpenEnv requires strict bounds: (0.0 < score < 1.0)
     score = round(float(final_score), 4)
-    return min(max(score, 0.0001), 0.9999)
+    if np.isnan(score):
+        return 0.01
+    return min(max(score, 0.01), 0.99)

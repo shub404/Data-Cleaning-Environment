@@ -61,17 +61,20 @@ class DataCleaningEnv:
 
         elif action.action_type == "done":
             self.done = True
-            reward = calculate_reward(self.data, self.ground_truth)
-            reasoning = f"Session complete. Final DQS: {reward}"
 
         if self.steps >= self.max_steps:
             self.done = True
-            reasoning += " (Max steps reached)"
 
-        # Ensure intermediate reward is strictly between 0 and 1
+        # If it's the final step, calculate the full Data Quality Score (DQS)
+        if self.done:
+            reward = calculate_reward(self.data, self.ground_truth)
+            reasoning = f"{reasoning} Final DQS: {reward}"
+
+        # Ensure reward is strictly between 0 and 1
+        final_reward = float(min(max(reward, 0.01), 0.99))
         return {
             "observation": self._get_observation(),
-            "reward": float(min(max(reward, 0.0001), 0.9999)),
+            "reward": final_reward,
             "done": self.done,
             "info": {
                 "reasoning": reasoning,
