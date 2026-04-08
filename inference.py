@@ -11,13 +11,12 @@ console = Console()
 # Official OpenEnv Env Vars
 API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
 MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o-mini")
-HF_TOKEN = os.getenv("HF_TOKEN")
+API_KEY = os.getenv("API_KEY")
 
 # OpenAI client configured with hackathon variables
-# We assume the base URL for the model is either API_BASE_URL or a derived path
 client = OpenAI(
-    base_url=f"{API_BASE_URL}/v1" if API_BASE_URL.endswith("/") is False else f"{API_BASE_URL}v1",
-    api_key=HF_TOKEN if HF_TOKEN else "no-token"
+    base_url=f"{API_BASE_URL}/v1" if not API_BASE_URL.endswith("/") else f"{API_BASE_URL}v1",
+    api_key=API_KEY if API_KEY else "no-token"
 )
 
 def log_start():
@@ -68,7 +67,7 @@ def get_action_from_llm(observation, reflection_prompt=""):
     """
     Standard OpenAI call using Hackathon environment variables.
     """
-    if not HF_TOKEN:
+    if not API_KEY:
         # Heuristic fallback if no token provided
         issues = observation.get("issues", [])
         if not issues: return {"action_type": "done"}
