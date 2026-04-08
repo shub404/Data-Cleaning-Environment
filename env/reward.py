@@ -37,4 +37,6 @@ def calculate_reward(current_data: pd.DataFrame, ground_truth: pd.DataFrame):
         (integrity * 0.10)
     )
 
-    return round(float(final_score), 4)
+    # OpenEnv requires strict bounds: (0.0 < score < 1.0)
+    score = round(float(final_score), 4)
+    return min(max(score, 0.0001), 0.9999)

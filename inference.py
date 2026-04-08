@@ -108,104 +108,137 @@ def heuristic_action(observation):
 
 # -------------------- MAIN -------------------- #
 
+def run_task(difficulty="hard"):
+    """
+    Runs a single cleaning task and returns the final score strictly in (0, 1).
+    Called at least 3 times so the validator sees 3 graded tasks.
+    """
+    print(f"\n[TASK START] difficulty={difficulty}")
+
+    # ---- RESET the environment ----
+    res = env_request("GET", f"/reset?difficulty={difficulty}")
+    if not res:
+        print("[FATAL] Cannot reach environment server at " + ENV_URL)
+        return None
+    if res.status_code != 200:
+        print(f"[FATAL] /reset returned {res.status_code}: {res.text[:500]}")
+        return None
+
+    data = parse_json(res)
+    if not data:
+        print("[FATAL] /reset response is not valid JSON")
+        return None
+    if "observation" not in data:
+        print(f"[FATAL] /reset missing 'observation'. Keys: {list(data.keys())}")
+        print(f"[FATAL] Body: {json.dumps(data)[:800]}")
+        return None
+
+    obs = data["observation"]
+    start_data = obs.get("data_preview", [])
+    total_reward = None
+    prev_reward = 0
+    reflection = ""
+
+    # ---- Step loop ----
+    for i in range(1, 11):
+        print(f"\n--- Step {i} ---")
+
+        action = get_action_from_llm(obs, reflection)
+
+        # Send action to environment
+        step_payload = {
+            "action_type": action.get("action_type", "done"),
+            "column": action.get("column"),
+        }
+        res = env_request("POST", "/step", json=step_payload)
+        if not res or res.status_code != 200:
+            print(f"[ERROR] /step failed at step {i}")
+            break
+
+        res_data = parse_json(res)
+        if not res_data:
+            print(f"[ERROR] /step response not valid JSON at step {i}")
+            break
+
+        reward = res_data.get("reward", 0.0001)
+        done = res_data.get("done", False)
+        info = res_data.get("info", {})
+        reasoning = info.get("reasoning", "n/a")
+
+        print(f"[STEP {i}] action={step_payload['action_type']} col={step_payload.get('column')} reward={reward} done={done}")
+        print(f"[STEP {i}] reasoning: {reasoning}")
+
+        # Reflection for next step
+        if reward < prev_reward:
+            reflection = "Previous action degraded quality. Try a different approach."
+        else:
+            reflection = ""
+        prev_reward = reward
+
+        if "observation" not in res_data:
+            print("[WARN] No observation in step response, ending early")
+            total_reward = reward
+            break
+
+        obs = res_data["observation"]
+
+        if done:
+            total_reward = reward
+            break
+
+        time.sleep(0.3)
+
+    # If the loop exhausted without done, use last known reward
+    if total_reward is None:
+        total_reward = prev_reward
+
+    # Ensure score is strictly between 0 and 1 (never 0.0 or 1.0)
+    total_reward = float(min(max(total_reward, 0.0001), 0.9999))
+
+    print(f"\n[TASK END] difficulty={difficulty} | Final score: {total_reward:.4f}")
+    return total_reward, obs, start_data
+
+
 def main():
-    print("[START] Agentic Data Cleaning Session")
+    print("[START] Agentic Data Cleaning — 3 Tasks")
 
+    # Run at least 3 tasks so the validator sees 3 graded tasks
+    difficulties = ["easy", "medium", "hard"]
+    all_scores = []
+    last_obs = None
+    last_start = []
+
+    for difficulty in difficulties:
+        result = run_task(difficulty)
+        if result is None:
+            print(f"[FATAL] Task '{difficulty}' failed to start.")
+            return
+        score, obs, start_data = result
+        all_scores.append(score)
+        last_obs = obs
+        last_start = start_data
+
+    print(f"\n[ALL TASKS COMPLETE] Scores: {all_scores}")
+
+    # ---- HTML report for the last task ----
     try:
-        # ---- RESET the environment ----
-        res = env_request("GET", "/reset?difficulty=hard")
-        if not res:
-            print("[FATAL] Cannot reach environment server at " + ENV_URL)
-            return
-        if res.status_code != 200:
-            print(f"[FATAL] /reset returned {res.status_code}: {res.text[:500]}")
-            return
-
-        data = parse_json(res)
-        if not data:
-            print("[FATAL] /reset response is not valid JSON")
-            return
-        if "observation" not in data:
-            print(f"[FATAL] /reset missing 'observation'. Keys: {list(data.keys())}")
-            print(f"[FATAL] Body: {json.dumps(data)[:800]}")
-            return
-
-        obs = data["observation"]
-        start_data = obs.get("data_preview", [])
-        total_reward = 0
-        prev_reward = 0
-        reflection = ""
-
-        # ---- Step loop ----
-        for i in range(1, 11):
-            print(f"\n--- Step {i} ---")
-
-            action = get_action_from_llm(obs, reflection)
-
-            # Send action to environment
-            step_payload = {
-                "action_type": action.get("action_type", "done"),
-                "column": action.get("column"),
-            }
-            res = env_request("POST", "/step", json=step_payload)
-            if not res or res.status_code != 200:
-                print(f"[ERROR] /step failed at step {i}")
-                break
-
-            res_data = parse_json(res)
-            if not res_data:
-                print(f"[ERROR] /step response not valid JSON at step {i}")
-                break
-
-            reward = res_data.get("reward", 0)
-            done = res_data.get("done", False)
-            info = res_data.get("info", {})
-            reasoning = info.get("reasoning", "n/a")
-
-            print(f"[STEP {i}] action={step_payload['action_type']} col={step_payload.get('column')} reward={reward} done={done}")
-            print(f"[STEP {i}] reasoning: {reasoning}")
-
-            # Reflection for next step
-            if reward < prev_reward:
-                reflection = "Previous action degraded quality. Try a different approach."
-            else:
-                reflection = ""
-            prev_reward = reward
-
-            if "observation" not in res_data:
-                print("[WARN] No observation in step response, ending early")
-                total_reward = reward
-                break
-
-            obs = res_data["observation"]
-
-            if done:
-                total_reward = reward
-                break
-
-            time.sleep(0.3)
-
-        print(f"\n[END] Final score: {total_reward:.4f}")
-
-        # ---- HTML report ----
-        try:
-            end_preview = obs.get("data_preview", []) if isinstance(obs, dict) else []
-            html = f"""<!DOCTYPE html>
+        end_preview = last_obs.get("data_preview", []) if isinstance(last_obs, dict) else []
+        html = f"""<!DOCTYPE html>
 <html><head><title>Scorecard</title></head><body>
 <h1>DataClean-RL Report</h1>
-<h2>Final Score: {total_reward:.4f}</h2>
-<h3>Before</h3><pre>{json.dumps(start_data[:5], indent=2)}</pre>
-<h3>After</h3><pre>{json.dumps(end_preview[:5], indent=2)}</pre>
+<h2>Scores: {all_scores}</h2>
+<h3>Before (last task)</h3><pre>{json.dumps(last_start[:5], indent=2)}</pre>
+<h3>After (last task)</h3><pre>{json.dumps(end_preview[:5], indent=2)}</pre>
 </body></html>"""
-            with open("integrity_report.html", "w") as f:
-                f.write(html)
-        except Exception as e:
-            print(f"[HTML ERROR] {e}")
-
+        with open("integrity_report.html", "w") as f:
+            f.write(html)
     except Exception as e:
-        print(f"[FATAL] {e}")
-        traceback.print_exc()
+        print(f"[HTML ERROR] {e}")
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        print(f"[FATAL] {e}")
+        traceback.print_exc()

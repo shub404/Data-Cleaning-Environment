@@ -30,7 +30,7 @@ class DataCleaningEnv:
             before = len(self.data)
             self.data = self.data.drop_duplicates()
             after = len(self.data)
-            reward = 0.2 if after < before else -0.05
+            reward = 0.2 if after < before else 0.0001
             reasoning = f"Removed {before - after} duplicate rows."
 
         elif action.action_type == "fill_missing":
@@ -68,9 +68,10 @@ class DataCleaningEnv:
             self.done = True
             reasoning += " (Max steps reached)"
 
+        # Ensure intermediate reward is strictly between 0 and 1
         return {
             "observation": self._get_observation(),
-            "reward": reward,
+            "reward": float(min(max(reward, 0.0001), 0.9999)),
             "done": self.done,
             "info": {
                 "reasoning": reasoning,
