@@ -37,8 +37,22 @@ def calculate_reward(current_data: pd.DataFrame, ground_truth: pd.DataFrame):
         (integrity * 0.10)
     )
 
-    # OpenEnv requires strict bounds: (0.0 < score < 1.0)
-    score = round(float(final_score), 4)
+    # FINAL FIXES (Robust Scoring for Validator)
+    score = float(final_score)
+
+    # Handle NaN
     if np.isnan(score):
-        return 0.01
-    return min(max(score, 0.01), 0.99)
+        score = 0.5
+
+    # STRICT clamp BEFORE rounding
+    score = max(0.01, min(0.99, score))
+
+    # Avoid exact boundary after rounding
+    score = round(score, 4)
+
+    if score <= 0.0:
+        score = 0.01
+    elif score >= 1.0:
+        score = 0.99
+
+    return score
