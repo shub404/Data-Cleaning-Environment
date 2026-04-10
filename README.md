@@ -66,5 +66,5 @@ You can explore the environment live at the following endpoints:
 
 ---
 
-## 🏆 Winners Choice
-Developed for top-tier hackathons. Optimized for clarity, performance and impact.
+## 🏁 Hackathon Project
+Built for competitive AI environments with a focus on performance, explainability, and real-world applicability.
